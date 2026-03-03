@@ -1,0 +1,22 @@
+{
+  "name": "palest-ink",
+  "owner": {
+    "name": "billhandsome52",
+    "email": ""
+  },
+  "metadata": {
+    "description": "Daily activity tracker - the faintest ink is better than the strongest memory (好记性不如烂笔头)",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "palest-ink",
+      "description": "Track git commits, web browsing, shell commands, and VS Code edits, then query and report on your daily activities",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/palest-ink"
+      ]
+    }
+  ]
+}
