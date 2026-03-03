@@ -15,6 +15,9 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 
 DATA_DIR = os.path.expanduser("~/.palest-ink/data")
 REPORTS_DIR = os.path.expanduser("~/.palest-ink/reports")
@@ -49,12 +52,31 @@ def load_day_records(d):
     return records
 
 
+def ts_to_local(ts_str):
+    """Parse a UTC timestamp string and return local datetime."""
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(LOCAL_TZ)
+    except Exception:
+        return None
+
+
+def ts_to_local_str(ts_str):
+    """Return HH:MM in local time."""
+    dt = ts_to_local(ts_str)
+    if dt:
+        return dt.strftime("%H:%M")
+    return ts_str[11:16] if len(ts_str) >= 16 else "??:??"
+
+
 def time_period(ts_str):
     """Classify a timestamp into morning/afternoon/evening."""
-    try:
-        hour = int(ts_str[11:13])
-    except (ValueError, IndexError):
+    dt = ts_to_local(ts_str)
+    if dt is None:
         return "other"
+    hour = dt.hour
     if 6 <= hour < 12:
         return "morning"
     elif 12 <= hour < 18:
@@ -63,6 +85,9 @@ def time_period(ts_str):
         return "evening"
     else:
         return "night"
+
+
+
 
 
 def period_label(period):
@@ -77,7 +102,7 @@ def period_label(period):
 
 def format_timeline_entry(record):
     ts = record.get("ts", "")
-    time_str = ts[11:16] if len(ts) >= 16 else "??:??"
+    time_str = ts_to_local_str(ts)
     rtype = record.get("type", "")
     data = record.get("data", {})
 

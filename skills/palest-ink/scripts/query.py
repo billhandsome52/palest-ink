@@ -16,6 +16,20 @@ import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def ts_to_local_str(ts_str):
+    """Convert UTC ISO timestamp to local time string (YYYY-MM-DD HH:MM:SS)."""
+    try:
+        dt = datetime.fromisoformat(ts_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ts_str[:19].replace("T", " ")
 
 DATA_DIR = os.path.expanduser("~/.palest-ink/data")
 
@@ -106,7 +120,7 @@ def search_records(records, term, search_content=False):
 
 def format_record_text(record):
     """Format a single record for text output."""
-    ts = record.get("ts", "")[:19].replace("T", " ")
+    ts = ts_to_local_str(record.get("ts", ""))
     rtype = record.get("type", "unknown")
     data = record.get("data", {})
     label = TYPE_LABELS.get(rtype, rtype)
