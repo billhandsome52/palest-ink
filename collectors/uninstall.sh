@@ -12,13 +12,25 @@ NC='\033[0m'
 info() { echo -e "${GREEN}[palest-ink]${NC} $1"; }
 warn() { echo -e "${YELLOW}[palest-ink]${NC} $1"; }
 
-# Step 1: Remove cron job
-info "Removing cron job..."
+# Step 1: Remove launchd agent
+PLIST_LABEL="com.palest-ink.collector"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+info "Removing launchd agent..."
+if launchctl list | grep -q "$PLIST_LABEL" 2>/dev/null; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+    info "launchd agent unloaded."
+fi
+if [ -f "$PLIST_PATH" ]; then
+    rm -f "$PLIST_PATH"
+    info "launchd plist removed."
+else
+    info "No launchd plist found."
+fi
+
+# Also remove legacy cron job if present
 if crontab -l 2>/dev/null | grep -q "palest-ink"; then
     crontab -l 2>/dev/null | grep -v "palest-ink" | crontab -
-    info "Cron job removed."
-else
-    info "No cron job found."
+    info "Legacy cron job removed."
 fi
 
 # Step 2: Restore git hooks path

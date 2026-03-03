@@ -102,18 +102,48 @@ cp "$SCRIPT_DIR"/collect_*.py "$PALEST_INK_DIR/bin/"
 cp "$SCRIPT_DIR/cron_collect.sh" "$PALEST_INK_DIR/bin/"
 chmod +x "$PALEST_INK_DIR/bin/cron_collect.sh"
 
-# Step 5: Install cron job
-info "Setting up cron job (every 3 minutes)..."
-CRON_CMD="*/3 * * * * ${PALEST_INK_DIR}/bin/cron_collect.sh >> ${PALEST_INK_DIR}/cron.log 2>&1"
+# Step 5: Install launchd agent (every 15 seconds)
+info "Setting up launchd agent (every 15 seconds)..."
+PLIST_LABEL="com.palest-ink.collector"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
-# Check if already installed
+# Remove old cron job if present
 if crontab -l 2>/dev/null | grep -q "palest-ink"; then
-    warn "Cron job already exists, updating..."
-    crontab -l 2>/dev/null | grep -v "palest-ink" | { cat; echo "$CRON_CMD # palest-ink"; } | crontab -
-else
-    (crontab -l 2>/dev/null; echo "$CRON_CMD # palest-ink") | crontab -
+    warn "Removing old cron job..."
+    crontab -l 2>/dev/null | grep -v "palest-ink" | crontab -
 fi
-info "Cron job installed."
+
+# Unload existing plist if present
+if launchctl list | grep -q "$PLIST_LABEL" 2>/dev/null; then
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
+fi
+
+cat > "$PLIST_PATH" << PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${PLIST_LABEL}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>${PALEST_INK_DIR}/bin/cron_collect.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>15</integer>
+    <key>StandardOutPath</key>
+    <string>${PALEST_INK_DIR}/cron.log</string>
+    <key>StandardErrorPath</key>
+    <string>${PALEST_INK_DIR}/cron.log</string>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+PLISTEOF
+
+launchctl load "$PLIST_PATH"
+info "launchd agent installed (every 15 seconds)."
 
 # Step 6: Check permissions for Safari
 if [ -f "$HOME/Library/Safari/History.db" ]; then
@@ -143,7 +173,7 @@ info "============================================"
 info ""
 info "Data directory: $PALEST_INK_DIR"
 info "Git hooks: active (post-commit, post-merge, post-checkout, pre-push)"
-info "Cron job: every 3 minutes"
+info "launchd agent: every 15 seconds"
 info ""
 info "Try making a git commit — then check:"
 info "  cat $PALEST_INK_DIR/data/\$(date +%Y)/\$(date +%m)/\$(date +%d).jsonl"
