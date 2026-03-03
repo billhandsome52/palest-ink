@@ -35,7 +35,8 @@ DATA_DIR = os.path.expanduser("~/.palest-ink/data")
 
 ACTIVITY_TYPES = {
     "git_commit", "git_push", "git_pull", "git_checkout",
-    "web_visit", "shell_command", "vscode_edit"
+    "web_visit", "shell_command", "vscode_edit",
+    "app_focus", "file_change",
 }
 
 TYPE_LABELS = {
@@ -46,6 +47,8 @@ TYPE_LABELS = {
     "web_visit": "Web Visit",
     "shell_command": "Shell Command",
     "vscode_edit": "VS Code Edit",
+    "app_focus": "App Focus",
+    "file_change": "File Change",
 }
 
 
@@ -168,6 +171,20 @@ def format_record_text(record):
         filepath = data.get("file_path", "")
         lang = data.get("language", "")
         return f"[{ts}] {label}: {filepath} ({lang})"
+
+    elif rtype == "app_focus":
+        app = data.get("app_name", "")
+        window = data.get("window_title", "")
+        dur = data.get("duration_seconds", 0)
+        suffix = f" — {window[:60]}" if window else ""
+        return f"[{ts}] {label}: {app}{suffix} ({dur}s)"
+
+    elif rtype == "file_change":
+        path = data.get("path", "")
+        lang = data.get("language", "")
+        workspace = os.path.basename(data.get("workspace", ""))
+        suffix = f" in {workspace}" if workspace else ""
+        return f"[{ts}] {label}: {path} ({lang}){suffix}"
 
     else:
         return f"[{ts}] {label}: {json.dumps(data, ensure_ascii=False)[:100]}"

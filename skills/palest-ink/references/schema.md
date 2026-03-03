@@ -118,14 +118,58 @@ Source: `vscode_collector`
 }
 ```
 
+### app_focus
+Source: `app_collector`
+
+```json
+{
+  "app_name": "Cursor",
+  "window_title": "palest_ink — main.py",
+  "duration_seconds": 45
+}
+```
+
+Records the frontmost application and window. When the same app+window is detected in consecutive collection cycles, `duration_seconds` is accumulated in-place rather than creating new records.
+
+### file_change
+Source: `fsevent_collector`
+
+```json
+{
+  "path": "/Users/xuyun/project/src/main.py",
+  "workspace": "/Users/xuyun/project",
+  "language": "python",
+  "event": "modified"
+}
+```
+
+Detected via `find -newer <marker>` on directories listed in `watched_dirs` (or `tracked_repos` as fallback). The `workspace` field is the nearest parent directory containing a `.git` folder.
+
+### shell_command (enhanced)
+Source: `shell_collector`
+
+```json
+{
+  "command": "git log --oneline -5",
+  "duration_seconds": 2
+}
+```
+
+`duration_seconds` is extracted from the zsh extended history format (`: timestamp:duration;command`). Set to `null` for bash or simple-format zsh history.
+
 ## Configuration
 
 Config file: `~/.palest-ink/config.json`
 
 Key fields:
-- `collectors`: Enable/disable individual collectors
+- `collectors`: Enable/disable individual collectors (including `app` and `fsevent`)
 - `tracked_repos`: List of git repo paths for git_scan collector
+- `watched_dirs`: Directories to monitor for file changes (falls back to `tracked_repos` if empty)
 - `exclude_patterns.urls`: URL prefixes to ignore
 - `exclude_patterns.commands`: Regex patterns for commands to ignore
 - `content_fetch.max_urls_per_run`: Max URLs to fetch per collection cycle
 - `content_fetch.summary_max_chars`: Max chars for content summary
+- `app.min_focus_seconds`: Minimum session duration to show in Focus Sessions report (default: 600)
+- `app.exclude`: App names to skip during app focus collection
+- `app_categories`: Map of category names to app name lists for usage grouping
+- `app_last_app`, `app_last_window`, `app_last_ts`, `app_last_record_line`: State for app focus in-place duration merging

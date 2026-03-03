@@ -44,7 +44,7 @@ def should_exclude(cmd, patterns):
 
 
 def parse_zsh_history(filepath, start_line):
-    """Parse zsh extended history format: : timestamp:0;command"""
+    """Parse zsh extended history format: : timestamp:duration;command"""
     entries = []
     try:
         with open(filepath, "rb") as f:
@@ -61,20 +61,21 @@ def parse_zsh_history(filepath, start_line):
             continue
 
         # Extended history format: : timestamp:duration;command
-        match = re.match(r'^: (\d+):\d+;(.+)$', line)
+        match = re.match(r'^: (?P<ts>\d+):(?P<dur>\d+);(?P<cmd>.+)$', line)
         if match:
-            ts = int(match.group(1))
-            cmd = match.group(2).strip()
+            ts = int(match.group("ts"))
+            dur = int(match.group("dur"))
+            cmd = match.group("cmd").strip()
             try:
                 dt = datetime.fromtimestamp(ts, tz=timezone.utc)
             except (OSError, ValueError):
                 continue
-            entries.append((dt, cmd))
+            entries.append((dt, cmd, dur if dur > 0 else None))
         # Multi-line commands (continuation lines start with space or no colon prefix)
         elif entries and not line.startswith(": ") and line.strip():
             # Append to previous command
-            prev_dt, prev_cmd = entries[-1]
-            entries[-1] = (prev_dt, prev_cmd + "\n" + line)
+            prev_dt, prev_cmd, prev_dur = entries[-1]
+            entries[-1] = (prev_dt, prev_cmd + "\n" + line, prev_dur)
         # Simple format (no timestamps) — treat each non-empty line as a command
         elif not line.startswith(": ") and line.strip() and not entries:
             # First line with no timestamp — this is simple format, switch to simple parser
@@ -94,7 +95,7 @@ def _parse_zsh_simple(lines, start_line):
             continue
         cmd = line.strip()
         if cmd:
-            entries.append((now, cmd))
+            entries.append((now, cmd, None))
     return entries, current_line
 
 
@@ -130,7 +131,7 @@ def parse_bash_history(filepath, start_line):
                 pending_ts = None
             else:
                 dt = datetime.now(timezone.utc)
-            entries.append((dt, line))
+            entries.append((dt, line, None))
 
     return entries, current_line
 
@@ -158,7 +159,7 @@ def collect():
     records_by_file = {}
     count = 0
 
-    for dt, cmd in entries:
+    for dt, cmd, duration in entries:
         if should_exclude(cmd, exclude_patterns):
             continue
         # Skip very long commands (likely data, not real commands)
@@ -171,6 +172,7 @@ def collect():
             "source": "shell_collector",
             "data": {
                 "command": cmd,
+                "duration_seconds": duration,
             }
         }
 

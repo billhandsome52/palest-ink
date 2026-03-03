@@ -22,6 +22,9 @@ trap "rm -f '$LOCKFILE'" EXIT
 
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Starting collection..."
 
+# Phase 0: App focus (fastest, highest priority)
+timeout 5 python3 "$BIN_DIR/collect_app.py" 2>&1 || true
+
 # Phase 1: Browser history (creates web_visit records with content_pending=true)
 python3 "$BIN_DIR/collect_chrome.py" 2>&1 || true
 python3 "$BIN_DIR/collect_safari.py" 2>&1 || true
@@ -33,5 +36,8 @@ python3 "$BIN_DIR/collect_content.py" 2>&1 || true
 python3 "$BIN_DIR/collect_shell.py" 2>&1 || true
 python3 "$BIN_DIR/collect_vscode.py" 2>&1 || true
 python3 "$BIN_DIR/collect_git.py" 2>&1 || true
+
+# Phase 4: Filesystem events (find can be slow, run last)
+timeout 15 python3 "$BIN_DIR/collect_fsevent.py" 2>&1 || true
 
 echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Collection complete."

@@ -33,6 +33,10 @@ if [ ! -f "$PALEST_INK_DIR/config.json" ]; then
   "vscode_last_ts": 0,
   "git_scan_last_ts": "",
   "tracked_repos": [],
+  "app_last_app": "",
+  "app_last_window": "",
+  "app_last_ts": "",
+  "app_last_record_line": -1,
   "collectors": {
     "chrome": true,
     "safari": true,
@@ -40,7 +44,9 @@ if [ ! -f "$PALEST_INK_DIR/config.json" ]; then
     "vscode": true,
     "git_hooks": true,
     "git_scan": true,
-    "content": true
+    "content": true,
+    "app": true,
+    "fsevent": true
   },
   "exclude_patterns": {
     "urls": [
@@ -62,7 +68,17 @@ if [ ! -f "$PALEST_INK_DIR/config.json" ]; then
     "max_urls_per_run": 50,
     "summary_max_chars": 800,
     "timeout_seconds": 10
-  }
+  },
+  "app": {
+    "min_focus_seconds": 600,
+    "exclude": ["loginwindow", "Dock", "SystemUIServer", "Finder", "ScreenSaverEngine"]
+  },
+  "app_categories": {
+    "development": ["Cursor", "Code", "Xcode", "Terminal", "iTerm2", "Warp"],
+    "browser": ["Google Chrome", "Safari", "Firefox", "Arc"],
+    "communication": ["Slack", "WeChat", "Discord", "Zoom"]
+  },
+  "watched_dirs": []
 }
 CONFIGEOF
 else
@@ -155,6 +171,12 @@ if [ -f "$HOME/Library/Safari/History.db" ]; then
         info "Safari history access: OK"
     fi
 fi
+
+# Step 6b: Accessibility permission notice for app focus tracking
+warn ""
+warn "App Focus Tracking requires Accessibility permission:"
+warn "  System Settings > Privacy & Security > Accessibility > Terminal.app (enable)"
+warn "Without this, collect_app.py will not be able to detect the frontmost app."
 
 # Step 7: Check Chrome
 if [ -f "$HOME/Library/Application Support/Google/Chrome/Default/History" ]; then

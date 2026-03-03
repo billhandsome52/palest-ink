@@ -17,10 +17,19 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+CONFIG_FILE = os.path.expanduser("~/.palest-ink/config.json")
+
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 
 DATA_DIR = os.path.expanduser("~/.palest-ink/data")
 REPORTS_DIR = os.path.expanduser("~/.palest-ink/reports")
+
+
+def load_config():
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as f:
+            return json.load(f)
+    return {}
 
 
 def parse_date(s):
@@ -90,6 +99,22 @@ def time_period(ts_str):
 
 
 
+def format_duration(seconds):
+    """Format seconds into human-readable duration string."""
+    if seconds is None or seconds < 0:
+        return "0s"
+    seconds = int(seconds)
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h > 0:
+        return f"{h}h{m:02d}m" if m > 0 else f"{h}h"
+    elif m > 0:
+        return f"{m}m{s:02d}s" if s > 0 else f"{m}m"
+    else:
+        return f"{s}s"
+
+
 def period_label(period):
     labels = {
         "morning": "Morning (06:00 - 12:00)",
@@ -144,11 +169,202 @@ def format_timeline_entry(record):
         lang = data.get("language", "")
         return f"- **{time_str}** Edited `{filename}` ({lang})"
 
+    elif rtype == "app_focus":
+        app = data.get("app_name", "")
+        window = data.get("window_title", "")
+        dur = data.get("duration_seconds", 0)
+        dur_str = format_duration(dur) if dur else ""
+        suffix = f" — {window[:50]}" if window else ""
+        return f"- **{time_str}** {app}{suffix} ({dur_str})"
+
+    elif rtype == "file_change":
+        path = data.get("path", "")
+        filename = os.path.basename(path)
+        lang = data.get("language", "")
+        workspace = os.path.basename(data.get("workspace", ""))
+        suffix = f" in {workspace}" if workspace else ""
+        return f"- **{time_str}** Changed `{filename}` ({lang}){suffix}"
+
     return f"- **{time_str}** {rtype}"
+
+
+def _append_focus_sessions(lines, records, config):
+    """Append focus sessions section: merge adjacent same-app app_focus records."""
+    app_records = [r for r in records if r.get("type") == "app_focus"]
+    if not app_records:
+        return
+
+    min_focus = config.get("app", {}).get("min_focus_seconds", 600)
+    gap_threshold = 30 * 60  # 30 minutes
+
+    # Build sessions by merging adjacent records with same app and gap <= threshold
+    sessions = []
+    for r in app_records:
+        dt = ts_to_local(r.get("ts", ""))
+        if dt is None:
+            continue
+        app = r.get("data", {}).get("app_name", "")
+        dur = r.get("data", {}).get("duration_seconds", 0) or 0
+
+        if sessions:
+            last = sessions[-1]
+            last_end = last["end_dt"]
+            gap = (dt - last_end).total_seconds()
+            if last["app"] == app and gap <= gap_threshold:
+                last["total_duration"] += dur
+                last["end_dt"] = dt + timedelta(seconds=dur)
+                continue
+
+        sessions.append({
+            "app": app,
+            "start_dt": dt,
+            "end_dt": dt + timedelta(seconds=dur),
+            "total_duration": dur,
+        })
+
+    # Filter short sessions
+    sessions = [s for s in sessions if s["total_duration"] >= min_focus]
+    if not sessions:
+        return
+
+    lines.append("## 专注时段 (Focus Sessions)")
+    lines.append("")
+    for s in sessions:
+        start_str = s["start_dt"].strftime("%H:%M")
+        end_str = s["end_dt"].strftime("%H:%M")
+        dur_str = format_duration(s["total_duration"])
+        lines.append(f"- {start_str}–{end_str}  **{s['app']}** ({dur_str})")
+    lines.append("")
+
+
+def _append_app_usage(lines, records, config):
+    """Append app usage section: total time per app, grouped by category."""
+    app_records = [r for r in records if r.get("type") == "app_focus"]
+    if not app_records:
+        return
+
+    app_totals = defaultdict(int)
+    for r in app_records:
+        app = r.get("data", {}).get("app_name", "")
+        dur = r.get("data", {}).get("duration_seconds", 0) or 0
+        if app:
+            app_totals[app] += dur
+
+    if not app_totals:
+        return
+
+    categories = config.get("app_categories", {})
+    cat_totals = defaultdict(int)
+    for app, dur in app_totals.items():
+        for cat, cat_apps in categories.items():
+            if app in cat_apps:
+                cat_totals[cat] += dur
+                break
+
+    lines.append("## 应用使用时长 (App Usage)")
+    lines.append("")
+    lines.append("**Top 5 Applications:**")
+    lines.append("")
+    lines.append("| App | Duration |")
+    lines.append("|-----|----------|")
+    top5 = sorted(app_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+    for app, dur in top5:
+        lines.append(f"| {app} | {format_duration(dur)} |")
+    lines.append("")
+
+    if cat_totals:
+        lines.append("**By Category:**")
+        lines.append("")
+        cat_label = {"development": "Development", "browser": "Browser", "communication": "Communication"}
+        for cat, dur in sorted(cat_totals.items(), key=lambda x: x[1], reverse=True):
+            label = cat_label.get(cat, cat.capitalize())
+            lines.append(f"- **{label}**: {format_duration(dur)}")
+        lines.append("")
+
+
+def _append_shell_stats(lines, records):
+    """Append shell command statistics section."""
+    shell_records = [r for r in records if r.get("type") == "shell_command"]
+    if not shell_records:
+        return
+
+    lines.append("## Shell 命令统计 (Shell Stats)")
+    lines.append("")
+
+    # Top commands by frequency (first word of command)
+    cmd_counts = defaultdict(int)
+    for r in shell_records:
+        cmd = r.get("data", {}).get("command", "").strip()
+        if cmd:
+            prefix = cmd.split()[0] if cmd.split() else cmd
+            cmd_counts[prefix] += 1
+
+    if cmd_counts:
+        lines.append("**最高频命令 Top 5:**")
+        lines.append("")
+        top5 = sorted(cmd_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        for cmd, count in top5:
+            lines.append(f"- `{cmd}`: {count} times")
+        lines.append("")
+
+    # Top by duration (only when duration data is available)
+    timed = [
+        (r.get("data", {}).get("command", ""), r.get("data", {}).get("duration_seconds"))
+        for r in shell_records
+        if r.get("data", {}).get("duration_seconds") is not None
+    ]
+    if timed:
+        timed.sort(key=lambda x: x[1], reverse=True)
+        lines.append("**耗时最长命令 Top 5:**")
+        lines.append("")
+        for cmd, dur in timed[:5]:
+            lines.append(f"- `{cmd[:80]}` — {format_duration(dur)}")
+        lines.append("")
+
+
+def _append_cross_domain_correlation(lines, records):
+    """Append cross-domain correlation: keywords researched before each commit."""
+    git_commits = [r for r in records if r.get("type") == "git_commit"]
+    web_visits = [r for r in records if r.get("type") == "web_visit"]
+    if not git_commits or not web_visits:
+        return
+
+    correlations = []
+    for commit in git_commits:
+        commit_dt = ts_to_local(commit.get("ts", ""))
+        if commit_dt is None:
+            continue
+        window_start = commit_dt - timedelta(hours=2)
+
+        keywords = set()
+        for visit in web_visits:
+            visit_dt = ts_to_local(visit.get("ts", ""))
+            if visit_dt is None:
+                continue
+            if window_start <= visit_dt <= commit_dt:
+                kws = visit.get("data", {}).get("content_keywords", [])
+                keywords.update(kws)
+
+        if len(keywords) >= 3:
+            repo = os.path.basename(commit.get("data", {}).get("repo", ""))
+            msg = commit.get("data", {}).get("message", "")
+            correlations.append((repo, msg, sorted(keywords)[:8]))
+
+    if not correlations:
+        return
+
+    lines.append("## 跨域关联 (Cross-domain Correlation)")
+    lines.append("")
+    lines.append("Research topics found before git commits:")
+    lines.append("")
+    for repo, msg, kws in correlations:
+        lines.append(f"- **{repo}** `{msg}` ← researched: {', '.join(kws)}")
+    lines.append("")
 
 
 def generate_report(target_date, records):
     """Generate a markdown report for a single day."""
+    config = load_config()
     lines = []
     date_str = target_date.strftime("%Y-%m-%d")
     weekday = target_date.strftime("%A")
@@ -175,10 +391,21 @@ def generate_report(target_date, records):
         lines.append(f"- **{type_counts['shell_command']}** shell commands executed")
     if type_counts.get("vscode_edit"):
         lines.append(f"- **{type_counts['vscode_edit']}** files edited in VS Code")
+    if type_counts.get("app_focus"):
+        total_app_time = sum(
+            r.get("data", {}).get("duration_seconds", 0) or 0
+            for r in records if r.get("type") == "app_focus"
+        )
+        lines.append(f"- **{type_counts['app_focus']}** app focus events ({format_duration(total_app_time)} total)")
+    if type_counts.get("file_change"):
+        lines.append(f"- **{type_counts['file_change']}** file changes detected")
     lines.append("")
 
     # Timeline (only show significant events, not every shell command)
-    significant_types = {"git_commit", "git_push", "git_pull", "git_checkout", "web_visit", "vscode_edit"}
+    significant_types = {
+        "git_commit", "git_push", "git_pull", "git_checkout",
+        "web_visit", "vscode_edit", "app_focus", "file_change",
+    }
     significant = [r for r in records if r.get("type") in significant_types]
 
     if significant:
@@ -256,6 +483,12 @@ def generate_report(target_date, records):
         for lang, count in sorted(lang_counts.items(), key=lambda x: x[1], reverse=True):
             lines.append(f"- **{lang}**: {count} files")
         lines.append("")
+
+    # New analysis sections
+    _append_focus_sessions(lines, records, config)
+    _append_app_usage(lines, records, config)
+    _append_shell_stats(lines, records)
+    _append_cross_domain_correlation(lines, records)
 
     return "\n".join(lines)
 

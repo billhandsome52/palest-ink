@@ -22,8 +22,10 @@ tools: Read, Glob, Grep, Bash
 Palest Ink tracks the user's daily activities automatically:
 - **Git operations**: commits, pushes, pulls, branch switches
 - **Web browsing**: Chrome & Safari history with page content summaries
-- **Shell commands**: zsh/bash command history
+- **Shell commands**: zsh/bash command history with execution duration
 - **VS Code edits**: recently opened/edited files
+- **App focus**: which application is in the foreground, with time duration
+- **File changes**: files modified in watched directories
 
 All data is stored locally at `~/.palest-ink/data/YYYY/MM/DD.jsonl`.
 
@@ -77,6 +79,8 @@ python3 <SKILL_PATH>/scripts/query.py --date today --type git_commit --search "p
 | A webpage about X | `--type web_visit --search-content "keyword"` |
 | Shell commands | `--type shell_command --search "keyword"` |
 | VS Code files | `--type vscode_edit --search "keyword"` |
+| App focus / screen time | `--type app_focus --summary` |
+| File changes in project | `--type file_change --search "project"` |
 | Everything today | `--date today --summary` |
 | Date range | `--from 2026-03-01 --to 2026-03-07` |
 
@@ -109,8 +113,10 @@ If scripts fail or for simple lookups, read the JSONL files directly:
 - `git_pull` — data: repo, branch, is_squash
 - `git_checkout` — data: repo, from_ref, to_branch
 - `web_visit` — data: url, title, visit_duration_seconds, browser, content_summary, content_keywords
-- `shell_command` — data: command
+- `shell_command` — data: command, duration_seconds (null if not available)
 - `vscode_edit` — data: file_path, workspace, language
+- `app_focus` — data: app_name, window_title, duration_seconds
+- `file_change` — data: path, workspace, language, event
 
 ### Web Visit Content
 
