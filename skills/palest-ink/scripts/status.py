@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 PALEST_INK_DIR = os.path.expanduser("~/.palest-ink")
 CONFIG_FILE = os.path.join(PALEST_INK_DIR, "config.json")
 DATA_DIR = os.path.join(PALEST_INK_DIR, "data")
+CLEANUP_FLAG = os.path.join(PALEST_INK_DIR, "tmp", "cleanup_needed")
 
 
 def load_config():
@@ -53,6 +54,17 @@ def get_data_size():
         for f in files:
             total += os.path.getsize(os.path.join(root, f))
     return total
+
+
+def check_cleanup_needed():
+    """Return flag info dict if cleanup is needed, else None."""
+    if not os.path.exists(CLEANUP_FLAG):
+        return None
+    try:
+        with open(CLEANUP_FLAG, "r") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
 
 
 def check_cron():
@@ -105,9 +117,24 @@ def main():
 
     # Today's records
     total, counts = count_today_records()
+    data_bytes = get_data_size()
     print(f"Data directory: {DATA_DIR}")
-    print(f"Data size: {format_size(get_data_size())}")
+    print(f"Data size: {format_size(data_bytes)}")
     print()
+
+    # Cleanup warning
+    cleanup_flag = check_cleanup_needed()
+    if cleanup_flag is not None:
+        flag_size = cleanup_flag.get("size_human", "")
+        size_note = f" ({flag_size} MB)" if flag_size else ""
+        print("=" * 50)
+        print(f"  ⚠️  CLEANUP RECOMMENDED")
+        print(f"  Data{size_note} is approaching the 2 GB limit.")
+        print(f"  Run cleanup to remove oldest records:")
+        print(f"    python3 ~/.palest-ink/bin/cleanup.py --dry-run")
+        print(f"    python3 ~/.palest-ink/bin/cleanup.py")
+        print("=" * 50)
+        print()
 
     print(f"Today's records: {total}")
     if counts:

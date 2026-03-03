@@ -96,6 +96,28 @@ Show collector status and data statistics:
 python3 <SKILL_PATH>/scripts/status.py
 ```
 
+If the output contains "CLEANUP RECOMMENDED", proactively tell the user:
+> "Your palest-ink data is approaching 2 GB. Would you like me to clean up older records?"
+
+If the user agrees, first show a dry-run preview:
+
+```bash
+python3 ~/.palest-ink/bin/cleanup.py --dry-run
+```
+
+Present the preview (how many files, date range, records count, space to free).
+Then ask for explicit confirmation before actually deleting:
+
+```bash
+python3 ~/.palest-ink/bin/cleanup.py --force
+```
+
+Options:
+- `--max-size N` — threshold in GB (default: 2.0)
+- `--keep-days N` — always keep the most recent N days (default: 30)
+- `--dry-run` — preview only, no changes
+- `--force` — skip the interactive prompt (use after user confirms in chat)
+
 ## Fallback: Direct File Reading
 
 If scripts fail or for simple lookups, read the JSONL files directly:

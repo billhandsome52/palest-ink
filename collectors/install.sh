@@ -115,6 +115,7 @@ info "Git hooks installed (core.hooksPath -> $PALEST_INK_DIR/hooks)"
 # Step 4: Copy collector scripts to bin
 info "Copying collector scripts..."
 cp "$SCRIPT_DIR"/collect_*.py "$PALEST_INK_DIR/bin/"
+cp "$SCRIPT_DIR/cleanup.py" "$PALEST_INK_DIR/bin/"
 cp "$SCRIPT_DIR/cron_collect.sh" "$PALEST_INK_DIR/bin/"
 chmod +x "$PALEST_INK_DIR/bin/cron_collect.sh"
 
