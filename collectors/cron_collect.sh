@@ -32,6 +32,9 @@ python3 "$BIN_DIR/collect_safari.py" 2>&1 || true
 # Phase 2: Content fetching (fills in content_summary for pending URLs)
 python3 "$BIN_DIR/collect_content.py" 2>&1 || true
 
+# Phase 2b: AliDocs tab content (reads rendered content from open Chrome tabs)
+timeout 8 python3 "$BIN_DIR/collect_alidocs.py" 2>&1 || true
+
 # Phase 3: Other collectors
 python3 "$BIN_DIR/collect_shell.py" 2>&1 || true
 python3 "$BIN_DIR/collect_vscode.py" 2>&1 || true

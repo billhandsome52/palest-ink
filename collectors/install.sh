@@ -46,7 +46,8 @@ if [ ! -f "$PALEST_INK_DIR/config.json" ]; then
     "git_scan": true,
     "content": true,
     "app": true,
-    "fsevent": true
+    "fsevent": true,
+    "alidocs": true
   },
   "exclude_patterns": {
     "urls": [
@@ -178,6 +179,15 @@ warn ""
 warn "App Focus Tracking requires Accessibility permission:"
 warn "  System Settings > Privacy & Security > Accessibility > Terminal.app (enable)"
 warn "Without this, collect_app.py will not be able to detect the frontmost app."
+
+# Step 6c: Automation permission and Chrome setting for alidocs content collection
+warn ""
+warn "AliDocs Content Collection requires two steps:"
+warn "  1. Automation permission:"
+warn "     System Settings > Privacy & Security > Automation > Terminal.app > Google Chrome (enable)"
+warn "  2. Chrome JavaScript from Apple Events:"
+warn "     Chrome menu > View > Developer > Allow JavaScript from Apple Events (enable)"
+warn "Without these, collect_alidocs.py cannot read content from Chrome tabs."
 
 # Step 7: Check Chrome
 if [ -f "$HOME/Library/Application Support/Google/Chrome/Default/History" ]; then
