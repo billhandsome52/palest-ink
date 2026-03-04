@@ -121,13 +121,13 @@ def get_chrome_alidocs_tabs():
     # Detect Chrome JavaScript-from-AppleEvents disabled (error lines in output)
     js_disabled_keywords = ("Allow JavaScript from Apple Events", "Apple 事件中的 JavaScript")
     if any(kw in raw for kw in js_disabled_keywords):
-        if not os.path.exists(flag_file):
-            print(
-                "[alidocs] Chrome JavaScript from Apple Events is disabled.\n"
-                "  To enable: Chrome menu bar > View > Developer > "
-                "Allow JavaScript from Apple Events"
-            )
-            open(flag_file, "w").close()
+        # Always write the flag so the skill can detect and prompt the user
+        open(flag_file, "w").close()
+        print(
+            "[alidocs] 需要开启 Chrome 设置才能采集钉钉文档内容：\n"
+            "  Chrome 菜单栏 > 显示 > 开发者 > 允许 Apple 事件中的 JavaScript\n"
+            "  (英文版: View > Developer > Allow JavaScript from Apple Events)"
+        )
         return []
 
     # Clear the flag if JS is now working

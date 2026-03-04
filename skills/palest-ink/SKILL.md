@@ -118,6 +118,40 @@ Options:
 - `--dry-run` — preview only, no changes
 - `--force` — skip the interactive prompt (use after user confirms in chat)
 
+## AliDocs Document Content
+
+Palest Ink can capture the content of alidocs.dingtalk.com documents you browse.
+This requires a one-time Chrome setting to be enabled.
+
+### Setup Check
+
+When the user asks about a document or searches browsing history involving alidocs,
+first check if the setting is enabled:
+
+```bash
+test -f ~/.palest-ink/tmp/alidocs_js_disabled && echo "DISABLED" || echo "OK"
+```
+
+If output is `DISABLED`, tell the user:
+
+> 你的 Chrome 还未开启钉钉文档内容采集功能，需要手动开启一次：
+>
+> **Chrome 菜单栏 > 显示 > 开发者 > 允许 Apple 事件中的 JavaScript**
+>
+> （点击后该菜单项前会出现一个勾 ✓）开启后，下次打开钉钉文档时内容会自动被采集。
+
+Then stop and wait. Once the user enables it, the flag file will be automatically
+cleared on the next collection cycle.
+
+### Querying Document Content
+
+After setup, alidocs records are stored as `web_visit` with `content_source: "alidocs_tab"`.
+Search them using `--search-content`:
+
+```bash
+python3 <SKILL_PATH>/scripts/query.py --type web_visit --search-content "关键词"
+```
+
 ## Fallback: Direct File Reading
 
 If scripts fail or for simple lookups, read the JSONL files directly:
