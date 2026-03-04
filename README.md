@@ -16,6 +16,7 @@ A Claude Code skill that automatically tracks your daily development activities 
 | **VS Code** | Recently opened/edited files |
 | **App Focus** | Which application is in the foreground and how long |
 | **File Changes** | Files modified in your watched project directories |
+| **AliDocs** | Content of alidocs.dingtalk.com documents open in Chrome (reads rendered text from live tabs via AppleScript) |
 
 ### Reports
 
@@ -40,6 +41,7 @@ Ask Claude *"What did I do today?"* and get a structured daily report including:
 | "What shell commands took more than 30 seconds?" | Queries `shell_command` with `duration_seconds` |
 | "What files changed in the palest-ink project?" | Queries `file_change` records |
 | "Show my activity from last Monday to Wednesday" | Date-range query across multiple days |
+| "Which DingTalk doc mentioned the deployment plan?" | Searches AliDocs content by keyword |
 
 ## Installation
 
@@ -63,11 +65,22 @@ This will:
 **Accessibility** (for app focus tracking):
 > System Settings → Privacy & Security → Accessibility → enable Terminal.app
 
-### 3. Install as a Claude Code skill
+**Automation** (for AliDocs content collection):
+> System Settings → Privacy & Security → Automation → Terminal.app → enable Google Chrome
+
+### 3. (Optional) Enable AliDocs content collection
+
+To capture content from alidocs.dingtalk.com documents you browse, enable Chrome's JavaScript from Apple Events setting once:
+
+> **Chrome menu bar → View → Developer → Allow JavaScript from Apple Events**
+
+After this is enabled, the content of any open DingTalk document tab will be captured automatically on the next collection cycle. If this setting is not enabled, Claude will remind you when you query DingTalk document content.
+
+### 4. Install as a Claude Code skill
 
 Add the skill to your Claude Code settings by pointing to the `skills/` directory, or follow Claude Code's plugin installation instructions.
 
-### 4. (Optional) Configure watched directories
+### 5. (Optional) Configure watched directories
 
 Edit `~/.palest-ink/config.json` to set which directories to monitor for file changes:
 
@@ -90,6 +103,7 @@ Once installed, just talk to Claude:
 "What files did I change in the palest-ink project today?"
 "Which shell commands took the longest to run this week?"
 "Show me what I researched before my last commit"
+"Which DingTalk doc was about the three-color control system?"
 ```
 
 ## Data Storage
@@ -138,7 +152,8 @@ See [`skills/palest-ink/references/schema.md`](skills/palest-ink/references/sche
     "git_scan": true,
     "content": true,
     "app": true,
-    "fsevent": true
+    "fsevent": true,
+    "alidocs": true
   },
   "tracked_repos": ["/path/to/repo"],
   "watched_dirs": [],
@@ -163,6 +178,24 @@ See [`skills/palest-ink/references/schema.md`](skills/palest-ink/references/sche
 }
 ```
 
+## Data Cleanup
+
+Palest Ink monitors data directory size and warns when it approaches 2 GB. Ask Claude to clean up:
+
+```
+"Clean up my palest-ink data"
+```
+
+Claude will show a dry-run preview first (files to delete, date range, records count, space freed), then ask for confirmation before deleting anything. By default, the most recent 30 days are always preserved.
+
+Manual cleanup:
+
+```bash
+python3 ~/.palest-ink/bin/cleanup.py --dry-run       # preview
+python3 ~/.palest-ink/bin/cleanup.py --force          # delete
+python3 ~/.palest-ink/bin/cleanup.py --keep-days 60   # keep 60 days
+```
+
 ## Uninstallation
 
 ```bash
@@ -177,6 +210,7 @@ Removes the launchd agent, restores git hooks, and optionally deletes collected 
 - URL exclusion patterns filter out browser-internal and sensitive pages
 - Command exclusion patterns filter out noise (`ls`, `cd`, `clear`, etc.)
 - App focus collection skips the lock screen (`loginwindow`, `ScreenSaverEngine`)
+- AliDocs content is read from already-authenticated Chrome tabs — no credentials are stored
 - Accessible only to your local user account
 
 ## License
